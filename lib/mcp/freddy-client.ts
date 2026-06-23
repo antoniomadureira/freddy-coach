@@ -13,6 +13,7 @@ export interface Activity {
   maxHR?: number;
   calories?: number;
   trainingLoad?: number;
+  steps?: number;
 }
 
 export interface HealthMetric {
@@ -89,6 +90,7 @@ export class FreddyClient {
           else if (metricName.includes('averageHeartRateInBeatsPerMinute')) currentActivity.avgHR = numValue;
           else if (metricName.includes('maxHeartRateInBeatsPerMinute')) currentActivity.maxHR = numValue;
           else if (metricName.includes('activeKilocalories')) currentActivity.calories = numValue;
+          else if (metricName.includes('steps')) currentActivity.steps = numValue;
         }
       }
     }
@@ -115,7 +117,12 @@ export class FreddyClient {
         const restOfLine = line.substring(colonIndex + 1).trim();
         const valueMatch = restOfLine.match(/^([\d.]+)\s+([^\s(]+)/);
         if (valueMatch) {
-          metrics.push({ date: currentDate, metric: metricName, value: parseFloat(valueMatch[1]), unit: valueMatch[2] });
+          metrics.push({ 
+            date: currentDate, 
+            metric: metricName, 
+            value: parseFloat(valueMatch[1]), 
+            unit: valueMatch[2] 
+          });
         }
       }
     }
@@ -145,7 +152,8 @@ export class FreddyClient {
             "activity_activityName", "activity_activityType", "activity_distanceInMeters",
             "activity_durationInSeconds", "activity_totalElevationGainInMeters",
             "activity_startTimeOffsetInSeconds", "activity_averageHeartRateInBeatsPerMinute",
-            "activity_maxHeartRateInBeatsPerMinute", "activity_activeKilocalories"
+            "activity_maxHeartRateInBeatsPerMinute", "activity_activeKilocalories",
+            "activity_steps"
           ],
           start_date: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
           end_date: new Date().toISOString().split("T")[0],
@@ -157,22 +165,18 @@ export class FreddyClient {
 
   async getAllHealthMetrics(days: number = 30): Promise<HealthMetric[]> {
     try {
-      // Pedir métricas com nomes EXATOS da API
       const result: any = await this.client.callTool({
         name: "query_metrics",
         arguments: {
           metrics: [
-            // FC - NOMES CORRETOS
             "daily_averageHeartRateInBeatsPerMinute",
             "daily_maxHeartRateInBeatsPerMinute",
             "daily_minHeartRateInBeatsPerMinute",
-            // ACWR/Training Load - NOMES CORRETOS
             "acuteTrainingLoad_dailyAcuteChronicWorkloadRatio",
             "acuteTrainingLoad_dailyTrainingLoadAcute",
             "acuteTrainingLoad_dailyTrainingLoadChronic",
-            // Stress - NOME CORRETO
+            "acuteTrainingLoad_acwrStatus",
             "daily_averageStressLevel",
-            // Calorias e Passos - NOMES CORRETOS
             "daily_activeKilocalories",
             "daily_bmrKilocalories",
             "daily_steps",
@@ -183,7 +187,7 @@ export class FreddyClient {
         },
       });
       const text = extractText(result);
-      console.log("📥 Health metrics raw:", text.substring(0, 1000));
+      console.log("📥 Health metrics raw:", text.substring(0, 800));
       return this.parseHealthMetrics(text);
     } catch (err) {
       console.error("❌ Error fetching health metrics:", err);

@@ -1,156 +1,169 @@
 "use client";
+import { useEffect, useState } from "react";
+import { FreddyClient, HealthMetric } from "@/lib/mcp/freddy-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
-} from "recharts";
-import { Moon, Brain, Zap, TrendingUp } from "lucide-react";
+import { Moon, Brain, Zap, TrendingUp, Loader2, AlertCircle } from "lucide-react";
 
 export default function SleepPage() {
-  const mockData = getMockData();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      const accessToken = document.cookie.split("; ").find(row => row.startsWith("access_token="))?.split("=")[1];
+      if (!accessToken) { setLoading(false); return; }
+
+      try {
+        const client = new FreddyClient(accessToken);
+        await client.connect();
+        const health = await client.getAllHealthMetrics(30);
+        setData({ health });
+        await client.disconnect();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
+  if (!data) return <div className="p-8 text-center">Login necessário</div>;
+
+  const allHealth = data.health || [];
+  
+  // Verificar se há dados de sono
+  const sleepMetrics = allHealth.filter((m: HealthMetric) => 
+    m.metric.toLowerCase().includes('sleep')
+  );
+
+  // Métricas relacionadas (stress, FC repouso como proxy)
+  const last7Days = allHealth.filter((m: HealthMetric) => {
+    const daysAgo = (Date.now() - new Date(m.date).getTime()) / (1000 * 60 * 60 * 24);
+    return daysAgo <= 7;
+  });
+
+  const stressMetrics = last7Days.filter((m: HealthMetric) => m.metric.includes('averageStressLevel'));
+  const minHRMetrics = last7Days.filter((m: HealthMetric) => m.metric.includes('minHeartRate'));
+
+  const avgStress = stressMetrics.length > 0 
+    ? stressMetrics.reduce((s: number, m: HealthMetric) => s + m.value, 0) / stressMetrics.length 
+    : null;
+  const latestMinHR = minHRMetrics.length > 0 ? minHRMetrics[minHRMetrics.length - 1].value : null;
+
+  // Estimar readiness baseado em FC repouso e stress
+  const readinessScore = Math.round(
+    (latestMinHR ? Math.max(0, 100 - latestMinHR) : 50) * 0.6 +
+    (avgStress ? Math.max(0, 100 - avgStress) : 50) * 0.4
+  );
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <header>
         <h1 className="text-3xl md:text-4xl font-bold">Sono & Recuperação 🌙</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Estágios do sono, qualidade e impacto na prontidão
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Dados reais do teu Garmin fenix 7</p>
       </header>
 
-      {/* KPIs */}
+      {/* Aviso sobre dados de sono */}
+      {sleepMetrics.length === 0 && (
+        <Card className="card-neon bg-warning/5 border-warning/20">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-sm">Dados de sono não disponíveis</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                O teu plano FREE do freddy.coach não expõe dados detalhados de sono. 
+                Para aceder a fases do sono, duração e score, considera atualizar para o plano PRO.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* KPIs de recuperação (proxies) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KpiCard icon={<Moon className="w-5 h-5 text-primary" />} label="Duração Média" value="7h 42m" trend="+12min vs semana anterior" positive />
-        <KpiCard icon={<Brain className="w-5 h-5 text-accent" />} label="Sono Profundo" value="1h 28m" trend="18% do total" positive />
-        <KpiCard icon={<Zap className="w-5 h-5 text-warning" />} label="Readiness Score" value="82/100" trend="Óptimo" positive />
-        <KpiCard icon={<TrendingUp className="w-5 h-5 text-primary" />} label="Body Battery" value="78" trend="+5 vs ontem" positive />
+        <KpiCard
+          icon={<Moon className="w-5 h-5 text-primary" />}
+          label="Readiness Score"
+          value={readinessScore.toString()}
+          trend={readinessScore >= 70 ? "Óptimo" : readinessScore >= 40 ? "Moderado" : "Baixo"}
+          positive={readinessScore >= 70}
+        />
+        <KpiCard
+          icon={<TrendingUp className="w-5 h-5 text-accent" />}
+          label="FC Repouso"
+          value={latestMinHR ? Math.round(latestMinHR).toString() : '--'}
+          unit="bpm"
+          trend={latestMinHR && latestMinHR < 60 ? "Excelente" : "Normal"}
+          positive={latestMinHR ? latestMinHR < 60 : false}
+        />
+        <KpiCard
+          icon={<Zap className="w-5 h-5 text-warning" />}
+          label="Stress Médio"
+          value={avgStress ? Math.round(avgStress).toString() : '--'}
+          trend={avgStress && avgStress < 30 ? "Baixo" : avgStress && avgStress < 50 ? "Moderado" : "Alto"}
+          positive={avgStress ? avgStress < 30 : false}
+        />
+        <KpiCard
+          icon={<Brain className="w-5 h-5 text-accent" />}
+          label="Recuperação"
+          value={readinessScore >= 70 ? "Alta" : readinessScore >= 40 ? "Média" : "Baixa"}
+          trend="Baseada em FC e stress"
+          positive={readinessScore >= 70}
+        />
       </div>
 
-      {/* Distribuição de estágios */}
+      {/* Gráfico de Stress */}
       <section>
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
-          Distribuição de Estágios · Última Noite
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="card-neon">
-            <CardHeader>
-              <CardTitle className="text-sm">Composição do Sono</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col md:flex-row items-center gap-6">
-              <ResponsiveContainer width={220} height={220}>
-                <PieChart>
-                  <Pie
-                    data={mockData.stages}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {mockData.stages.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-3 flex-1">
-                {mockData.stages.map((stage: any) => (
-                  <div key={stage.name} className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ background: stage.color }} />
-                    <div className="flex-1">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-sm font-medium">{stage.name}</span>
-                        <span className="text-sm tabular-nums">{stage.value}h</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">{stage.percent}% da noite</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="card-neon">
-            <CardHeader>
-              <CardTitle className="text-sm">Timeline da Noite</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {mockData.timeline.map((block: any, i: number) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground w-16 tabular-nums">{block.time}</span>
-                    <div
-                      className="flex-1 h-6 rounded flex items-center px-2 text-xs font-medium text-white"
-                      style={{ background: block.color }}
-                    >
-                      {block.stage}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Histórico semanal */}
-      <section>
-        <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
-          Sono · Últimos 7 dias
+          Stress · Últimos 7 dias
         </h2>
         <Card className="card-neon">
           <CardContent className="p-5">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={mockData.weeklySleep}>
-                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                  label={{
-                    value: "horas",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" },
-                  }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 12,
-                    fontSize: 12,
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="deep" stackId="a" fill="#6366f1" name="Profundo" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="rem" stackId="a" fill="#a78bfa" name="REM" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="light" stackId="a" fill="#34d399" name="Leve" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {stressMetrics.length > 0 ? (
+              <div className="space-y-2">
+                {stressMetrics.map((m: HealthMetric, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-16">
+                      {new Date(m.date).toLocaleDateString("pt-PT", { day: '2-digit', month: '2-digit' })}
+                    </span>
+                    <div className="flex-1 h-6 bg-border rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all"
+                        style={{ 
+                          width: `${Math.min(100, m.value)}%`,
+                          background: m.value < 25 ? "hsl(var(--accent))" : m.value < 50 ? "hsl(var(--warning))" : "hsl(var(--danger))"
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold tabular-nums w-8 text-right">{m.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Sem dados de stress disponíveis
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
+
+      {/* Explicação */}
+      <Card className="card-neon bg-accent/5 border-accent/20">
+        <CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">
+            <strong className="text-foreground">💡 Nota:</strong> O Readiness Score é calculado com base na FC de repouso (peso 60%) e nível de stress (peso 40%). 
+            Valores mais altos indicam melhor recuperação e prontidão para treino.
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function KpiCard({ icon, label, value, trend, positive }: any) {
+function KpiCard({ icon, label, value, unit, trend, positive }: any) {
   return (
     <Card className="card-neon">
       <CardContent className="p-5">
@@ -158,42 +171,14 @@ function KpiCard({ icon, label, value, trend, positive }: any) {
           {icon}
           <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
         </div>
-        <div className="text-3xl font-bold tabular-nums">{value}</div>
-        <div className={`text-xs mt-2 ${positive ? "text-accent" : "text-danger"}`}>
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-bold tabular-nums">{value}</span>
+          {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+        </div>
+        <div className={`text-xs mt-2 ${positive ? "text-accent" : "text-muted-foreground"}`}>
           {trend}
         </div>
       </CardContent>
     </Card>
   );
-}
-
-function getMockData() {
-  return {
-    stages: [
-      { name: "Profundo", value: 1.47, percent: 19, color: "#6366f1" },
-      { name: "REM", value: 1.65, percent: 21, color: "#a78bfa" },
-      { name: "Leve", value: 4.0, percent: 52, color: "#34d399" },
-      { name: "Desperto", value: 0.5, percent: 8, color: "#f87171" },
-    ],
-    timeline: [
-      { time: "23:00", stage: "Adormecer", color: "#6366f1" },
-      { time: "23:30", stage: "Leve", color: "#34d399" },
-      { time: "00:15", stage: "Profundo", color: "#6366f1" },
-      { time: "01:30", stage: "REM", color: "#a78bfa" },
-      { time: "02:45", stage: "Leve", color: "#34d399" },
-      { time: "03:20", stage: "Profundo", color: "#6366f1" },
-      { time: "04:30", stage: "REM", color: "#a78bfa" },
-      { time: "06:00", stage: "Leve", color: "#34d399" },
-      { time: "06:42", stage: "Despertar", color: "#f87171" },
-    ],
-    weeklySleep: [
-      { day: "Seg", deep: 1.3, rem: 1.5, light: 4.2 },
-      { day: "Ter", deep: 1.5, rem: 1.7, light: 4.0 },
-      { day: "Qua", deep: 1.2, rem: 1.4, light: 4.5 },
-      { day: "Qui", deep: 1.6, rem: 1.8, light: 3.8 },
-      { day: "Sex", deep: 1.4, rem: 1.6, light: 4.1 },
-      { day: "Sáb", deep: 1.8, rem: 2.0, light: 4.3 },
-      { day: "Dom", deep: 1.5, rem: 1.7, light: 4.0 },
-    ],
-  };
 }
