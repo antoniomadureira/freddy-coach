@@ -1,0 +1,45 @@
+{
+  "name": "freddy-coach",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@radix-ui/react-progress": "^1.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "framer-motion": "^12.40.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^0.460.0",
+    "next": "^15.0.0",
+    "next-auth": "^5.0.0-beta.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.0",
+    "react-markdown": "^10.1.0",
+    "recharts": "^2.12.7",
+    "remark-gfm": "^4.0.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^2.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.0.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.0"
+  }
+}
