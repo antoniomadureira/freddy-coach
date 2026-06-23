@@ -23,23 +23,27 @@ export interface HealthMetric {
   unit: string;
 }
 
+// Helper function para extrair texto com tipo correto
 function extractText(result: any): string {
   try {
-    if (result?.content?.[0]?.text) return result.content[0].text;
+    const content = (result as any)?.content;
+    if (Array.isArray(content) && content[0]?.text) {
+      return content[0].text;
+    }
   } catch {}
   return '';
 }
 
 export class FreddyClient {
-  private client: Client;
+  private client: any;
   private accessToken: string;
   private connected: boolean = false;
 
   constructor(accessToken: string) {
     this.accessToken = accessToken;
-    this.client = new Client(
+    this.client = new (Client as any)(
       { name: "freddy-dashboard", version: "1.0.0" },
-      {}
+      { capabilities: {} }
     );
   }
 
@@ -131,21 +135,21 @@ export class FreddyClient {
 
   async getProfile(): Promise<string | null> {
     try {
-      const result: any = await this.client.callTool({ name: "get_profile", arguments: {} });
+      const result = await this.client.callTool({ name: "get_profile", arguments: {} });
       return extractText(result) || null;
     } catch { return null; }
   }
 
   async listAvailableMetrics(): Promise<string | null> {
     try {
-      const result: any = await this.client.callTool({ name: "list_metrics", arguments: {} });
+      const result = await this.client.callTool({ name: "list_metrics", arguments: {} });
       return extractText(result) || null;
     } catch { return null; }
   }
 
   async getActivities(days: number = 30): Promise<Activity[]> {
     try {
-      const result: any = await this.client.callTool({
+      const result = await this.client.callTool({
         name: "query_metrics",
         arguments: {
           metrics: [
@@ -165,7 +169,7 @@ export class FreddyClient {
 
   async getAllHealthMetrics(days: number = 30): Promise<HealthMetric[]> {
     try {
-      const result: any = await this.client.callTool({
+      const result = await this.client.callTool({
         name: "query_metrics",
         arguments: {
           metrics: [
@@ -187,10 +191,10 @@ export class FreddyClient {
         },
       });
       const text = extractText(result);
-      console.log("📥 Health metrics raw:", text.substring(0, 800));
+      console.log("Health metrics raw:", text.substring(0, 800));
       return this.parseHealthMetrics(text);
     } catch (err) {
-      console.error("❌ Error fetching health metrics:", err);
+      console.error("Error fetching health metrics:", err);
       return [];
     }
   }

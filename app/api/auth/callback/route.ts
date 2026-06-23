@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-function getCookie(name: string, cookieString: string): string | null {
-  const match = cookieString.split(";").find(row => row.trim().startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.split("=")[1]) : null;
-}
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
@@ -12,30 +7,34 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
 
   if (error) {
-    const errorDesc = searchParams.get("error_description");
-    console.error("❌ OAuth Error:", error, errorDesc);
+    console.error("OAuth Error:", error, searchParams.get("error_description"));
     return NextResponse.redirect(new URL(`/auth/login?error=${error}`, request.url));
   }
 
   if (!code || !state) {
-    console.error("❌ Missing code or state");
+    console.error("Missing code or state");
     return NextResponse.json({ error: "Missing code or state" }, { status: 400 });
   }
 
   try {
     const cookieString = request.headers.get("cookie") || "";
-    const storedState = getCookie("oauth_state", cookieString);
-    const codeVerifier = getCookie("code_verifier", cookieString);
-    const clientId = getCookie("client_id", cookieString);
-    const clientSecret = getCookie("client_secret", cookieString);
+    const getCookie = (name: string) => {
+      const match = cookieString.split(";").find(row => row.trim().startsWith(`${name}=`));
+      return match ? decodeURIComponent(match.split("=")[1]) : null;
+    };
+
+    const storedState = getCookie("oauth_state");
+    const codeVerifier = getCookie("code_verifier");
+    const clientId = getCookie("client_id");
+    const clientSecret = getCookie("client_secret");
 
     if (state !== storedState) {
-      console.error("❌ State mismatch");
+      console.error("State mismatch");
       return NextResponse.json({ error: "Invalid state" }, { status: 400 });
     }
 
     if (!clientId || !codeVerifier) {
-      console.error("❌ Missing credentials");
+      console.error("Missing credentials");
       return NextResponse.json({ error: "Missing OAuth data" }, { status: 400 });
     }
 
@@ -56,7 +55,7 @@ export async function GET(request: NextRequest) {
       tokenHeaders["Authorization"] = `Basic ${credentials}`;
     }
 
-    console.log("🔄 Exchanging code for token...");
+    console.log("Exchanging code for token...");
     
     const tokenResponse = await fetch("https://freddy.coach/oauth/token", {
       method: "POST",
@@ -66,46 +65,53 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
-      console.error("❌ Token exchange failed:", errorData);
+      console.error("Token exchange failed:", errorData);
       throw new Error(errorData.error_description || "Token exchange failed");
     }
 
     const tokens = await tokenResponse.json();
-    console.log("✅ Token received!");
-    console.log("  Expires in:", tokens.expires_in);
+    console.log("Token received!");
+    console.log("Access Token:", tokens.access_token ? tokens.access_token.substring(0, 30) + "..." : "null");
 
-    // Redirect to dashboard with tokens (MAX AGE = 7 dias)
+    const expiresAt = tokens.expires_in ? Date.now() + (tokens.expires_in * 1000) : Date.now() + (3600 * 1000);
+
     const response = NextResponse.redirect(new URL("/dashboard", request.url));
     
-    const maxAge = tokens.expires_in || 3600; // 1 hora default
-    
     response.cookies.set("access_token", tokens.access_token, {
-      httpOnly: false,  // Precisa ser false para o client ler
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: maxAge,
+      maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });
 
     if (tokens.refresh_token) {
       response.cookies.set("refresh_token", tokens.refresh_token, {
-        httpOnly: false,
+        httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 30 * 24 * 60 * 60, // 30 dias
+        maxAge: 30 * 24 * 60 * 60,
         path: "/",
       });
     }
 
-    // Clean up temp cookies
+    response.cookies.set("token_expires_at", expiresAt.toString(), {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60,
+      path: "/",
+    });
+
     response.cookies.delete("oauth_state");
     response.cookies.delete("code_verifier");
     response.cookies.delete("client_id");
     response.cookies.delete("client_secret");
 
+    console.log("Cookies set, redirecting to dashboard");
     return response;
   } catch (error) {
-    console.error("❌ Callback error:", error);
+    console.error("Callback error:", error);
     return NextResponse.redirect(new URL("/auth/login?error=auth_failed", request.url));
   }
 }
