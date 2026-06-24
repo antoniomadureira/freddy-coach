@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { FreddyClient, Activity, HealthMetric } from "@/lib/mcp/freddy-client";
 import { Loader2, Heart, Activity as ActivityIcon, TrendingUp, Zap, Calendar, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,60 +11,50 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
-      // Verificar token - tentar de várias formas
-      let accessToken: string | null = null;
-      
-      // Tentar 1: Ler de cookie non-httpOnly
-      const tokenCookie = document.cookie.split("; ").find(row => row.startsWith("access_token="));
-      if (tokenCookie) {
-        accessToken = tokenCookie.split("=")[1];
-        console.log("✅ Token found in cookie:", accessToken?.substring(0, 20) + "...");
-      }
-
-      // Tentar 2: Verificar se há erro na URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlError = urlParams.get("error");
-      if (urlError) {
-        setError(`Erro de autenticação: ${urlError}`);
-        setLoading(false);
-        return;
-      }
-      
-      if (!accessToken) {
-        console.warn("⚠️ No access token found");
-        setError("Sessão expirada. Faz login novamente.");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const client = new FreddyClient(accessToken);
-        await client.connect();
-        
-        const [profile, activities, health] = await Promise.all([
-          client.getProfile(),
-          client.getActivities(30),
-          client.getAllHealthMetrics(30),
-        ]);
-
-        console.log("Dados recebidos:", {
-          atividades: activities.length,
-          healthMetrics: health.length
-        });
-
-        setData({ profile, activities, health });
-        await client.disconnect();
-      } catch (err) {
-        console.error("❌ Error loading data:", err);
-        setError("Erro ao carregar dados. Tenta fazer login novamente.");
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    // Verificar token
+    let accessToken: string | null = null;
+    const tokenCookie = document.cookie.split("; ").find(row => row.startsWith("access_token="));
+    if (tokenCookie) {
+      accessToken = tokenCookie.split("=")[1];
+      console.log("✅ Token found in cookie:", accessToken?.substring(0, 20) + "...");
     }
-    loadData();
+
+    if (!accessToken) {
+      console.warn("⚠️ No access token found");
+      setError("Sessão expirada. Faz login novamente.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const client = new FreddyClient(accessToken);
+      await client.connect();
+      
+      const [profile, activities, health] = await Promise.all([
+        client.getProfile(),
+        client.getActivities(30),
+        client.getAllHealthMetrics(30),
+      ]);
+
+      console.log("Dados recebidos:", {
+        atividades: activities.length,
+        healthMetrics: health.length
+      });
+
+      setData({ profile, activities, health });
+      await client.disconnect();
+    } catch (err) {
+      console.error("❌ Error loading data:", err);
+      setError("Erro ao carregar dados. Tenta fazer login novamente.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   if (loading) {
     return (
@@ -77,12 +67,12 @@ export default function DashboardPage() {
     );
   }
 
-  if (error || !data) {
+  if (error && !data) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4 max-w-md">
           <AlertCircle className="w-12 h-12 mx-auto text-warning" />
-          <p className="text-muted-foreground">{error || "Login necessário"}</p>
+          <p className="text-muted-foreground">{error}</p>
           <button
             onClick={() => window.location.href = "/auth/login"}
             className="px-6 py-3 bg-primary text-background rounded-lg font-medium hover:bg-primary/90 transition-colors"
@@ -94,8 +84,8 @@ export default function DashboardPage() {
     );
   }
 
-  // ========== RESTANTE CÓDIGO DO DASHBOARD (manter igual) ==========
-  const weekActivities = data.activities?.filter((a: Activity) => {
+  // ========== RESTANTE DO CÓDIGO (manter igual) ==========
+  const weekActivities = data?.activities?.filter((a: Activity) => {
     const daysAgo = (Date.now() - new Date(a.date).getTime()) / (1000 * 60 * 60 * 24);
     return daysAgo <= 7;
   }) || [];
@@ -104,7 +94,7 @@ export default function DashboardPage() {
   const totalTime = weekActivities.reduce((sum: number, a: Activity) => sum + a.duration, 0);
   const totalElevation = weekActivities.reduce((sum: number, a: Activity) => sum + (a.elevation || 0), 0);
 
-  const allHealth = data.health || [];
+  const allHealth = data?.health || [];
 
   const getLatest = (metricName: string) => {
     const metrics = allHealth.filter(m => m.metric.includes(metricName) && m.value > 0);
