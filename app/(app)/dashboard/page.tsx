@@ -1,391 +1,587 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { FreddyClient, Activity, HealthMetric } from "@/lib/mcp/freddy-client";
-import { Loader2, Heart, Activity as ActivityIcon, TrendingUp, Zap, Calendar, AlertCircle } from "lucide-react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
+import { Progress } from "@/components/ui/progress";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  BarChart,
+  Bar,
+} from "recharts";
+import {
+  Activity,
+  TrendingUp,
+  Heart,
+  Moon,
+  Footprints,
+  Trophy,
+  Clock,
+  MapPin,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+} from "lucide-react";
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
-    // Verificar token
-    let accessToken: string | null = null;
-    const tokenCookie = document.cookie.split("; ").find(row => row.startsWith("access_token="));
-    if (tokenCookie) {
-      accessToken = tokenCookie.split("=")[1];
-      console.log("✅ Token found in cookie:", accessToken?.substring(0, 20) + "...");
-    }
-
-    if (!accessToken) {
-      console.warn("⚠️ No access token found");
-      setError("Sessão expirada. Faz login novamente.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const client = new FreddyClient(accessToken);
-      await client.connect();
-      
-      const [profile, activities, health] = await Promise.all([
-        client.getProfile(),
-        client.getActivities(30),
-        client.getAllHealthMetrics(30),
-      ]);
-
-      console.log("Dados recebidos:", {
-        atividades: activities.length,
-        healthMetrics: health.length
-      });
-
-      setData({ profile, activities, health });
-      await client.disconnect();
-    } catch (err) {
-      console.error("❌ Error loading data:", err);
-      setError("Erro ao carregar dados. Tenta fazer login novamente.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    // Simular fetch de dados - substituir por chamada real ao MCP
+    const fetchData = async () => {
+      setLoading(true);
+      // Aqui entraria a chamada real à API MCP
+      // const client = await createRealMCPClient(tokens);
+      // const healthData = await client.getHealthMetrics();
+      // const activities = await client.getActivities();
+      setData(getMockData());
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center h-screen">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+          <Activity className="h-12 w-12 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">A carregar dados...</p>
         </div>
       </div>
     );
   }
 
-  if (error && !data) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4 max-w-md">
-          <AlertCircle className="w-12 h-12 mx-auto text-warning" />
-          <p className="text-muted-foreground">{error}</p>
-          <button
-            onClick={() => window.location.href = "/auth/login"}
-            className="px-6 py-3 bg-primary text-background rounded-lg font-medium hover:bg-primary/90 transition-colors"
-          >
-            Fazer Login
-          </button>
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Visão geral da tua performance e prontidão
+          </p>
+        </div>
+        <Badge variant="outline" className="text-sm">
+          Última atualização: {new Date().toLocaleDateString("pt-PT")}
+        </Badge>
+      </div>
+
+      {/* SECÇÃO 1: Painel "In Focus" */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Card 1: Training Readiness */}
+        <Card className="col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Training Readiness
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="relative w-32 h-32">
+                <svg className="w-full h-full" viewBox="0 0 36 36">
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#374151"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="3"
+                    strokeDasharray={`${data?.readiness?.score || 0}, 100`}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold">
+                    {data?.readiness?.score || 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/ 100</span>
+                </div>
+              </div>
+              <Badge
+                className={
+                  (data?.readiness?.score || 0) >= 75
+                    ? "bg-green-500"
+                    : (data?.readiness?.score || 0) >= 50
+                    ? "bg-yellow-500"
+                    : "bg-red-500"
+                }
+              >
+                {data?.readiness?.status || "Ótimo"}
+              </Badge>
+              <div className="grid grid-cols-3 gap-2 w-full text-xs">
+                <div className="text-center">
+                  <p className="text-muted-foreground">Sono</p>
+                  <p className="font-semibold">{data?.readiness?.sleep || 85}%</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-muted-foreground">HRV</p>
+                  <p className="font-semibold">{data?.readiness?.hrv || 72}%</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-muted-foreground">Carga</p>
+                  <p className="font-semibold">{data?.readiness?.load || 68}%</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Training Status */}
+        <Card className="col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Training Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">VO₂ Max</span>
+                  <span className="font-semibold">{data?.vo2max || 54.2}</span>
+                </div>
+                <Progress value={data?.vo2max || 54.2} className="h-2" />
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Carga Semanal</span>
+                  <span className="font-semibold">{data?.weeklyLoad || 420}</span>
+                </div>
+                <Progress value={(data?.weeklyLoad || 420) / 6} className="h-2" />
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">HRV Status</span>
+                  <span className="font-semibold text-green-500">Estável</span>
+                </div>
+                <Progress value={75} className="h-2" />
+              </div>
+            </div>
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-2">Últimas 4 semanas</p>
+              <ResponsiveContainer width="100%" height={60}>
+                <LineChart data={data?.weeklyTrend || []}>
+                  <Line
+                    type="monotone"
+                    dataKey="load"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Running Summary */}
+        <Card className="col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Running Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Distância</span>
+                </div>
+                <span className="font-bold">{data?.weeklyDistance || 42.5} km</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Tempo</span>
+                </div>
+                <span className="font-bold">{data?.weeklyTime || "4:32:15"}</span>
+              </div>
+              <div className="pt-2">
+                <ResponsiveContainer width="100%" height={80}>
+                  <BarChart data={data?.dailyDistance || []}>
+                    <Bar dataKey="km" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Cross-Training */}
+        <Card className="col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Cross-Training
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Activity className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Força</p>
+                    <p className="text-xs text-muted-foreground">Esta semana</p>
+                  </div>
+                </div>
+                <span className="font-bold">{data?.strengthSessions || 3}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <Heart className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Cardio</p>
+                    <p className="text-xs text-muted-foreground">Esta semana</p>
+                  </div>
+                </div>
+                <span className="font-bold">{data?.cardioSessions || 2}</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground text-center">
+                Total: {data?.totalCrossTraining || 5} sessões
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* SECÇÃO 2: Comparação YTD vs Ano Anterior */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Comparação Anual (YTD)</h2>
+        <div className="grid gap-4 md:grid-cols-5">
+          <ComparisonCard
+            icon={<Activity className="h-5 w-5" />}
+            label="Corridas"
+            current={data?.ytd?.runs || 105}
+            previous={data?.ytd?.runsPrevious || 87}
+            suffix=""
+          />
+          <ComparisonCard
+            icon={<MapPin className="h-5 w-5" />}
+            label="Distância"
+            current={data?.ytd?.distance || 1566.6}
+            previous={data?.ytd?.distancePrevious || 1317.7}
+            suffix=" km"
+          />
+          <ComparisonCard
+            icon={<Clock className="h-5 w-5" />}
+            label="Tempo"
+            current={data?.ytd?.time || "132:43"}
+            previous={data?.ytd?.timePrevious || "118:22"}
+            suffix=""
+            isTime
+          />
+          <ComparisonCard
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Elevação"
+            current={data?.ytd?.elevation || 13323}
+            previous={data?.ytd?.elevationPrevious || 11245}
+            suffix=" m"
+          />
+          <ComparisonCard
+            icon={<Heart className="h-5 w-5" />}
+            label="FC Média"
+            current={data?.ytd?.avgHR || 137}
+            previous={data?.ytd?.avgHRPrevious || 137}
+            suffix=" bpm"
+          />
         </div>
       </div>
-    );
-  }
 
-  // ========== RESTANTE DO CÓDIGO (manter igual) ==========
-  const weekActivities = data?.activities?.filter((a: Activity) => {
-    const daysAgo = (Date.now() - new Date(a.date).getTime()) / (1000 * 60 * 60 * 24);
-    return daysAgo <= 7;
-  }) || [];
-
-  const totalDistance = weekActivities.reduce((sum: number, a: Activity) => sum + a.distance, 0) / 1000;
-  const totalTime = weekActivities.reduce((sum: number, a: Activity) => sum + a.duration, 0);
-  const totalElevation = weekActivities.reduce((sum: number, a: Activity) => sum + (a.elevation || 0), 0);
-
-  const allHealth = data?.health || [];
-
-  const getLatest = (metricName: string) => {
-    const metrics = allHealth.filter(m => m.metric.includes(metricName) && m.value > 0);
-    return metrics.length > 0 ? metrics[metrics.length - 1].value : null;
-  };
-
-  const getAverage = (metricName: string, days: number = 7) => {
-    const cutoffDate = Date.now() - (days * 24 * 60 * 60 * 1000);
-    const metrics = allHealth.filter(m => {
-      const metricDate = new Date(m.date).getTime();
-      return m.metric.includes(metricName) && m.value > 0 && metricDate >= cutoffDate;
-    });
-    if (metrics.length === 0) return null;
-    return metrics.reduce((sum, m) => sum + m.value, 0) / metrics.length;
-  };
-
-  const restingHR = getLatest('minHeartRate');
-  const avgHR = getAverage('averageHeartRate');
-  const maxHR = getLatest('maxHeartRate');
-  
-  const acwr = getLatest('dailyAcuteChronicWorkloadRatio');
-  const ctl = getLatest('dailyTrainingLoadChronic');
-  const atl = getLatest('dailyTrainingLoadAcute');
-  const tsb = (ctl && atl) ? (ctl - atl).toFixed(0) : null;
-  
-  const stressLevel = getAverage('averageStressLevel');
-  const steps = getLatest('steps');
-  const activeCalories = getLatest('activeKilocalories');
-
-  let estimatedVO2Max = null;
-  const runningActivities = weekActivities.filter((a: Activity) => 
-    a.type === 'RUNNING' && a.distance >= 1000 && a.duration > 0
-  );
-  
-  if (runningActivities.length > 0) {
-    const bestActivity = runningActivities.reduce((best: Activity, current: Activity) => {
-      const paceBest = best.duration / best.distance;
-      const paceCurrent = current.duration / current.distance;
-      return paceCurrent < paceBest ? current : best;
-    });
-    
-    const paceMinPerKm = (bestActivity.duration / 60) / (bestActivity.distance / 1000);
-    
-    if (paceMinPerKm >= 3 && paceMinPerKm <= 10) {
-      estimatedVO2Max = Math.round((15.3 - paceMinPerKm) * 3.5 + 35);
-      if (estimatedVO2Max < 30 || estimatedVO2Max > 75) {
-        if (paceMinPerKm < 5) estimatedVO2Max = 65;
-        else if (paceMinPerKm < 6) estimatedVO2Max = 55;
-        else estimatedVO2Max = 45;
-      }
-    }
-  }
-
-  const hrChartData = Array.from(new Set(allHealth.map(m => m.date))).sort().slice(-7).map(date => ({
-    date: new Date(date).toLocaleDateString("pt-PT", { day: '2-digit', month: '2-digit' }),
-    resting: allHealth.find(m => m.date === date && m.metric.includes('minHeartRate'))?.value || null,
-    avg: allHealth.find(m => m.date === date && m.metric.includes('averageHeartRate'))?.value || null,
-    max: allHealth.find(m => m.date === date && m.metric.includes('maxHeartRate'))?.value || null,
-  })).filter(d => d.avg !== null);
-
-  const dailyData = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((day, index) => {
-    const dayActs = weekActivities.filter((a: Activity) => {
-      const actDay = new Date(a.date).getDay();
-      return actDay === (index + 1) % 7;
-    });
-    const distance = dayActs.reduce((sum: number, a: Activity) => sum + a.distance, 0) / 1000;
-    return { day, distance };
-  });
-
-  return (
-    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
-      <header>
-        <h1 className="text-3xl md:text-4xl font-bold">Olá, Atleta 👟</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {new Date().toLocaleDateString("pt-PT", { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
-      </header>
-
-      <section>
-        <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Métricas Principais</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard icon={<Heart className="w-5 h-5 text-danger" />} label="FC Repouso" value={restingHR ? `${Math.round(restingHR)}` : '--'} unit="bpm" />
-          <KpiCard icon={<Zap className="w-5 h-5 text-primary" />} label="ACWR" value={acwr ? acwr.toFixed(2) : '--'} unit="ratio" />
-          <KpiCard icon={<ActivityIcon className="w-5 h-5 text-accent" />} label="Stress" value={stressLevel ? `${Math.round(stressLevel)}` : '--'} unit="avg" />
-          <KpiCard icon={<Calendar className="w-5 h-5 text-warning" />} label="Passos" value={steps ? steps.toLocaleString() : '--'} unit="steps" />
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">In Focus</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="card-neon">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Heart className="w-4 h-4 text-danger" />
-                Frequência Cardíaca
-              </CardTitle>
-              <Badge variant="outline" className="text-accent">
-                {restingHR && restingHR < 60 ? 'Excelente' : 'Normal'}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4 mb-4">
+      {/* SECÇÃO 3: Estado de Forma Profundo (TSB / CTL / ATL) */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Estado de Forma</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          {/* Banner de Estado */}
+          <Card className="col-span-3 bg-gradient-to-r from-green-900/20 to-blue-900/20 border-green-500/30">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">Repouso</div>
-                  <div className="text-2xl font-bold tabular-nums">{restingHR ? Math.round(restingHR) : '--'}</div>
-                  <div className="text-xs text-muted-foreground">bpm</div>
+                  <h3 className="text-lg font-semibold text-green-400">
+                    Forma Óptima - TSB +{data?.tsb || 4.0}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Estás numa fase ideal para competições. Mantém a carga atual
+                    e foca-te na recuperação.
+                  </p>
                 </div>
-                <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">Média</div>
-                  <div className="text-2xl font-bold tabular-nums">{avgHR ? Math.round(avgHR) : '--'}</div>
-                  <div className="text-xs text-muted-foreground">bpm</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">Máxima</div>
-                  <div className="text-2xl font-bold tabular-nums">{maxHR ? Math.round(maxHR) : '--'}</div>
-                  <div className="text-xs text-muted-foreground">bpm</div>
-                </div>
-              </div>
-              
-              {hrChartData.length > 0 && (
-                <ResponsiveContainer width="100%" height={120}>
-                  <LineChart data={hrChartData}>
-                    <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }} />
-                    <Line type="monotone" dataKey="max" stroke="hsl(var(--danger))" strokeWidth={1.5} dot={false} name="Máx" />
-                    <Line type="monotone" dataKey="avg" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Média" />
-                    <Line type="monotone" dataKey="resting" stroke="hsl(var(--accent))" strokeWidth={1.5} dot={false} name="Repouso" />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="card-neon">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                Training Status
-              </CardTitle>
-              <Badge variant="outline" className={acwr && acwr >= 0.8 && acwr <= 1.3 ? 'text-accent' : acwr && acwr < 0.8 ? 'text-warning' : 'text-danger'}>
-                {acwr ? (acwr <= 1.3 ? 'Produtiva' : 'Overreach') : 'N/A'}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">VO₂ Max</div>
-                  <div className="text-2xl font-bold tabular-nums">{estimatedVO2Max || '--'}</div>
-                  <div className="text-xs text-muted-foreground">ml/kg/min</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">ACWR</div>
-                  <div className="text-2xl font-bold tabular-nums">{acwr ? acwr.toFixed(2) : '--'}</div>
-                  <div className="text-xs text-muted-foreground">ratio</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">TSB</div>
-                  <div className="text-2xl font-bold tabular-nums">{tsb || '--'}</div>
-                  <div className="text-xs text-muted-foreground">forma</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">CTL (Fitness)</span>
-                  <span className="font-medium">{ctl ? ctl.toFixed(0) : '--'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ATL (Fadiga)</span>
-                  <span className="font-medium">{atl ? atl.toFixed(0) : '--'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Stress Médio</span>
-                  <span className="font-medium">{stressLevel ? Math.round(stressLevel) : '--'}</span>
-                </div>
+                <Badge className="bg-green-500 text-white">
+                  Pronto para competir
+                </Badge>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="card-neon">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <ActivityIcon className="w-4 h-4 text-accent" />
-                Running · Semana
-              </CardTitle>
+          {/* Card: Estado de Forma (TSB) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">TSB (Forma)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-bold tabular-nums">{totalDistance.toFixed(1)}</span>
-                <span className="text-sm text-muted-foreground">km · {Math.floor(totalTime / 3600)}:{String(Math.floor((totalTime % 3600) / 60)).padStart(2, '0')}h</span>
+              <div className="text-center">
+                <span className="text-4xl font-bold text-green-500">
+                  +{data?.tsb || 4.0}
+                </span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Training Stress Balance
+                </p>
               </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <BarChart data={dailyData}>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }} />
-                  <Bar dataKey="distance" radius={[6, 6, 0, 0]}>
-                    {dailyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.distance > 0 ? "hsl(var(--accent))" : "hsl(var(--border))"} />
-                    ))}
-                  </Bar>
-                </BarChart>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Overreach</span>
+                  <span>Fresco</span>
+                </div>
+                <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="absolute h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500"
+                    style={{
+                      left: "0",
+                      width: `${((data?.tsb || 4) + 30) / 60 * 100}%`,
+                    }}
+                  />
+                  <div
+                    className="absolute h-full w-1 bg-white"
+                    style={{
+                      left: `${((data?.tsb || 4) + 30) / 60 * 100}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>-30</span>
+                  <span>0</span>
+                  <span>+30</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="text-center p-2 bg-muted rounded">
+                  <p className="text-muted-foreground">CTL</p>
+                  <p className="font-bold">{data?.ctl || 85}</p>
+                </div>
+                <div className="text-center p-2 bg-muted rounded">
+                  <p className="text-muted-foreground">ATL</p>
+                  <p className="font-bold">{data?.atl || 81}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card: Gráfico 8 Semanas */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm">Evolução CTL/ATL/TSB (8 semanas)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={data?.fitnessEvolution || []}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="week" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ctl"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Fitness (CTL)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="atl"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Fadiga (ATL)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="tsb"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Forma (TSB)"
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          <Card className="card-neon">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-primary" />
-                Resumo 7 Dias
-              </CardTitle>
+          {/* Card: Performance Radar */}
+          <Card className="md:col-span-3">
+            <CardHeader>
+              <CardTitle className="text-sm">Radar de Performance</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <MetricRow label="Atividades" value={weekActivities.length.toString()} />
-              <MetricRow label="Distância" value={`${totalDistance.toFixed(1)} km`} />
-              <MetricRow label="Tempo" value={`${Math.floor(totalTime / 3600)}h ${Math.floor((totalTime % 3600) / 60)}m`} />
-              <MetricRow label="Elevação" value={`${Math.round(totalElevation)} m`} />
-              <MetricRow label="Calorias" value={activeCalories ? `${Math.round(activeCalories)} kcal` : '--'} />
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart data={data?.radarData || []}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                  <Radar
+                    name="Performance Atual"
+                    dataKey="A"
+                    stroke="#10b981"
+                    fill="#10b981"
+                    fillOpacity={0.6}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
-      </section>
-
-      <section>
-        <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Atividades Recentes</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {weekActivities.slice(0, 3).map((activity: Activity, index: number) => (
-            <Card key={index} className="card-neon">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="font-semibold text-sm">{activity.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(activity.date).toLocaleDateString("pt-PT", { weekday: 'short', day: 'numeric', month: 'short' })}
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">{activity.type}</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <div className="text-muted-foreground">Distância</div>
-                    <div className="font-bold">{(activity.distance / 1000).toFixed(2)} km</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Duração</div>
-                    <div className="font-bold">{Math.floor(activity.duration / 60)}:{(activity.duration % 60).toString().padStart(2, '0')}</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Elevação</div>
-                    <div className="font-bold">{activity.elevation?.toFixed(0) || 0} m</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">FC Média</div>
-                    <div className="font-bold">{activity.avgHR || '--'} bpm</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
 
-function KpiCard({ icon, label, value, unit }: any) {
+// Componente de Comparação YTD
+function ComparisonCard({
+  icon,
+  label,
+  current,
+  previous,
+  suffix,
+  isTime = false,
+}: any) {
+  const diff = isTime
+    ? 0
+    : typeof current === "number" && typeof previous === "number"
+    ? ((current - previous) / previous) * 100
+    : 0;
+  const isPositive = diff > 0;
+  const isNeutral = diff === 0;
+
   return (
-    <Card className="card-neon">
+    <Card>
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-2">
-          {icon}
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold tabular-nums">{value}</span>
-          {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            {icon}
+            <span className="text-sm">{label}</span>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold">
+                {isTime ? current : current.toFixed(1)}
+              </span>
+              <span className="text-sm text-muted-foreground">{suffix}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground">vs {previous}</span>
+              {!isNeutral && (
+                <>
+                  {isPositive ? (
+                    <ArrowUpRight className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className={isPositive ? "text-green-500" : "text-red-500"}>
+                    {diff > 0 ? "+" : ""}
+                    {diff.toFixed(0)}%
+                  </span>
+                </>
+              )}
+              {isNeutral && <Minus className="h-3 w-3 text-muted-foreground" />}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function MetricRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-bold tabular-nums">{value}</span>
-    </div>
-  );
+// Dados mockados para demonstração
+function getMockData() {
+  return {
+    readiness: {
+      score: 78,
+      status: "Ótimo",
+      sleep: 85,
+      hrv: 72,
+      load: 68,
+    },
+    vo2max: 54.2,
+    weeklyLoad: 420,
+    weeklyDistance: 42.5,
+    weeklyTime: "4:32:15",
+    strengthSessions: 3,
+    cardioSessions: 2,
+    totalCrossTraining: 5,
+    ytd: {
+      runs: 105,
+      runsPrevious: 87,
+      distance: 1566.6,
+      distancePrevious: 1317.7,
+      time: "132:43",
+      timePrevious: "118:22",
+      elevation: 13323,
+      elevationPrevious: 11245,
+      avgHR: 137,
+      avgHRPrevious: 137,
+    },
+    tsb: 4.0,
+    ctl: 85,
+    atl: 81,
+    weeklyTrend: [
+      { week: "W1", load: 380 },
+      { week: "W2", load: 420 },
+      { week: "W3", load: 450 },
+      { week: "W4", load: 420 },
+    ],
+    dailyDistance: [
+      { day: "Seg", km: 8 },
+      { day: "Ter", km: 0 },
+      { day: "Qua", km: 10 },
+      { day: "Qui", km: 6 },
+      { day: "Sex", km: 0 },
+      { day: "Sáb", km: 12 },
+      { day: "Dom", km: 6.5 },
+    ],
+    fitnessEvolution: [
+      { week: "W1", ctl: 78, atl: 75, tsb: 3 },
+      { week: "W2", ctl: 80, atl: 78, tsb: 2 },
+      { week: "W3", ctl: 82, atl: 82, tsb: 0 },
+      { week: "W4", ctl: 83, atl: 80, tsb: 3 },
+      { week: "W5", ctl: 84, atl: 79, tsb: 5 },
+      { week: "W6", ctl: 85, atl: 81, tsb: 4 },
+      { week: "W7", ctl: 85, atl: 80, tsb: 5 },
+      { week: "W8", ctl: 85, atl: 81, tsb: 4 },
+    ],
+    radarData: [
+      { subject: "Pace", A: 85, fullMark: 100 },
+      { subject: "FC Baixa", A: 78, fullMark: 100 },
+      { subject: "Volume", A: 90, fullMark: 100 },
+      { subject: "Fitness", A: 85, fullMark: 100 },
+      { subject: "Frescura", A: 72, fullMark: 100 },
+      { subject: "Elevação", A: 68, fullMark: 100 },
+    ],
+  };
 }

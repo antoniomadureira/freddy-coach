@@ -39,7 +39,7 @@ export class MCPRealClient {
     return this;
   }
 
-  // Métricas de Saúde
+  // M\u00e9tricas de Sa\u00fade
   async getHealthMetrics(date?: string) {
     const result = await this.client.callTool({
       name: "garmin.health.get_daily",
@@ -115,7 +115,7 @@ export class MCPRealClient {
   async chatWithCoach(message: string, context?: any) {
     const result = await this.client.callTool({
       name: "ai.coach.chat",
-      arguments: { 
+      arguments: {
         message,
         context: context || {},
         stream: false,

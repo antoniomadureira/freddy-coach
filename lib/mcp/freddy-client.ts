@@ -13,7 +13,6 @@ export interface Activity {
   maxHR?: number;
   calories?: number;
   trainingLoad?: number;
-  steps?: number;
 }
 
 export interface HealthMetric {
@@ -23,27 +22,23 @@ export interface HealthMetric {
   unit: string;
 }
 
-// Helper function para extrair texto com tipo correto
 function extractText(result: any): string {
   try {
-    const content = (result as any)?.content;
-    if (Array.isArray(content) && content[0]?.text) {
-      return content[0].text;
-    }
+    if (result?.content?.[0]?.text) return result.content[0].text;
   } catch {}
   return '';
 }
 
 export class FreddyClient {
-  private client: any;
+  private client: Client;
   private accessToken: string;
   private connected: boolean = false;
 
   constructor(accessToken: string) {
     this.accessToken = accessToken;
-    this.client = new (Client as any)(
+    this.client = new Client(
       { name: "freddy-dashboard", version: "1.0.0" },
-      { capabilities: {} }
+      {}
     );
   }
 
@@ -51,7 +46,14 @@ export class FreddyClient {
     if (this.connected) return this;
     const transport = new StreamableHTTPClientTransport(
       new URL("https://freddy.coach/mcp"),
-      { requestInit: { headers: { "Authorization": `Bearer ${this.accessToken}`, "Content-Type": "application/json" } } }
+      { 
+        requestInit: { 
+          headers: { 
+            "Authorization": `Bearer ${this.accessToken}`, 
+            "Content-Type": "application/json" 
+          } 
+        } 
+      }
     );
     await this.client.connect(transport);
     this.connected = true;
@@ -80,11 +82,11 @@ export class FreddyClient {
         const colonIndex = line.indexOf(':');
         const metricName = line.substring(0, colonIndex).trim();
         const restOfLine = line.substring(colonIndex + 1).trim();
-        const valueMatch = restOfLine.match(/^(.+?)\s+\(Garmin/);
+        const valueMatch = restOfLine.match(/^(.+?)\s+(Garmin|freddy)/);
         if (valueMatch) {
           const value = valueMatch[1].trim();
           const numValue = parseFloat(value.replace(/[^\d.]/g, ''));
-          
+
           if (metricName.includes('activityName')) currentActivity.name = value;
           else if (metricName.includes('activityType')) currentActivity.type = value;
           else if (metricName.includes('distanceInMeters')) currentActivity.distance = numValue;
@@ -94,7 +96,6 @@ export class FreddyClient {
           else if (metricName.includes('averageHeartRateInBeatsPerMinute')) currentActivity.avgHR = numValue;
           else if (metricName.includes('maxHeartRateInBeatsPerMinute')) currentActivity.maxHR = numValue;
           else if (metricName.includes('activeKilocalories')) currentActivity.calories = numValue;
-          else if (metricName.includes('steps')) currentActivity.steps = numValue;
         }
       }
     }
@@ -113,7 +114,10 @@ export class FreddyClient {
 
     for (const line of lines) {
       const dateMatch = line.match(/^(\d{4}-\d{2}-\d{2}):/);
-      if (dateMatch) { currentDate = dateMatch[1]; continue; }
+      if (dateMatch) { 
+        currentDate = dateMatch[1]; 
+        continue; 
+      }
 
       if (currentDate && line.includes(':')) {
         const colonIndex = line.indexOf(':');
@@ -135,41 +139,51 @@ export class FreddyClient {
 
   async getProfile(): Promise<string | null> {
     try {
-      const result = await this.client.callTool({ name: "get_profile", arguments: {} });
+      const result: any = await this.client.callTool({ name: "get_profile", arguments: {} });
       return extractText(result) || null;
-    } catch { return null; }
+    } catch { 
+      return null; 
+    }
   }
 
   async listAvailableMetrics(): Promise<string | null> {
     try {
-      const result = await this.client.callTool({ name: "list_metrics", arguments: {} });
+      const result: any = await this.client.callTool({ name: "list_metrics", arguments: {} });
       return extractText(result) || null;
-    } catch { return null; }
+    } catch { 
+      return null; 
+    }
   }
 
   async getActivities(days: number = 30): Promise<Activity[]> {
     try {
-      const result = await this.client.callTool({
+      const result: any = await this.client.callTool({
         name: "query_metrics",
         arguments: {
           metrics: [
-            "activity_activityName", "activity_activityType", "activity_distanceInMeters",
-            "activity_durationInSeconds", "activity_totalElevationGainInMeters",
-            "activity_startTimeOffsetInSeconds", "activity_averageHeartRateInBeatsPerMinute",
-            "activity_maxHeartRateInBeatsPerMinute", "activity_activeKilocalories",
-            "activity_steps"
+            "activity_activityName", 
+            "activity_activityType", 
+            "activity_distanceInMeters",
+            "activity_durationInSeconds", 
+            "activity_totalElevationGainInMeters",
+            "activity_startTimeOffsetInSeconds", 
+            "activity_averageHeartRateInBeatsPerMinute",
+            "activity_maxHeartRateInBeatsPerMinute", 
+            "activity_activeKilocalories"
           ],
           start_date: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
           end_date: new Date().toISOString().split("T")[0],
         },
       });
       return this.parseActivities(extractText(result));
-    } catch { return []; }
+    } catch { 
+      return []; 
+    }
   }
 
   async getAllHealthMetrics(days: number = 30): Promise<HealthMetric[]> {
     try {
-      const result = await this.client.callTool({
+      const result: any = await this.client.callTool({
         name: "query_metrics",
         arguments: {
           metrics: [
@@ -179,7 +193,6 @@ export class FreddyClient {
             "acuteTrainingLoad_dailyAcuteChronicWorkloadRatio",
             "acuteTrainingLoad_dailyTrainingLoadAcute",
             "acuteTrainingLoad_dailyTrainingLoadChronic",
-            "acuteTrainingLoad_acwrStatus",
             "daily_averageStressLevel",
             "daily_activeKilocalories",
             "daily_bmrKilocalories",
@@ -191,15 +204,18 @@ export class FreddyClient {
         },
       });
       const text = extractText(result);
-      console.log("Health metrics raw:", text.substring(0, 800));
+      console.log("📥 Health metrics raw:", text.substring(0, 1000));
       return this.parseHealthMetrics(text);
     } catch (err) {
-      console.error("Error fetching health metrics:", err);
+      console.error("❌ Error fetching health metrics:", err);
       return [];
     }
   }
 
   async disconnect() {
-    if (this.connected) { await this.client.close(); this.connected = false; }
+    if (this.connected) { 
+      await this.client.close(); 
+      this.connected = false; 
+    }
   }
 }
