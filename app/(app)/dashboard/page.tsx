@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { FreddyClient, Activity, HealthMetric } from "@/lib/mcp/freddy-client";
-import { Loader2, Heart, Activity as ActivityIcon, TrendingUp, Zap, Calendar } from "lucide-react";
+import { Loader2, Heart, Activity as ActivityIcon, TrendingUp, Zap, Calendar, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
@@ -9,11 +9,35 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
-      const accessToken = document.cookie.split("; ").find(row => row.startsWith("access_token="))?.split("=")[1];
-      if (!accessToken) { setLoading(false); return; }
+      // Verificar token - tentar de várias formas
+      let accessToken: string | null = null;
+      
+      // Tentar 1: Ler de cookie non-httpOnly
+      const tokenCookie = document.cookie.split("; ").find(row => row.startsWith("access_token="));
+      if (tokenCookie) {
+        accessToken = tokenCookie.split("=")[1];
+        console.log("✅ Token found in cookie:", accessToken?.substring(0, 20) + "...");
+      }
+
+      // Tentar 2: Verificar se há erro na URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlError = urlParams.get("error");
+      if (urlError) {
+        setError(`Erro de autenticação: ${urlError}`);
+        setLoading(false);
+        return;
+      }
+      
+      if (!accessToken) {
+        console.warn("⚠️ No access token found");
+        setError("Sessão expirada. Faz login novamente.");
+        setLoading(false);
+        return;
+      }
 
       try {
         const client = new FreddyClient(accessToken);
@@ -25,17 +49,16 @@ export default function DashboardPage() {
           client.getAllHealthMetrics(30),
         ]);
 
-        console.log("📊 DADOS RECEBIDOS:");
-        console.log("  Atividades:", activities.length);
-        console.log("  Health Metrics:", health.length);
-        
-        const metricTypes = new Set(health.map((m: HealthMetric) => m.metric));
-        console.log("  Tipos disponíveis:", Array.from(metricTypes));
+        console.log("Dados recebidos:", {
+          atividades: activities.length,
+          healthMetrics: health.length
+        });
 
         setData({ profile, activities, health });
         await client.disconnect();
       } catch (err) {
-        console.error("❌ Error:", err);
+        console.error("❌ Error loading data:", err);
+        setError("Erro ao carregar dados. Tenta fazer login novamente.");
       } finally {
         setLoading(false);
       }
@@ -43,10 +66,35 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
-  if (!data) return <div className="p-8 text-center">Login necessário</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">A carregar dados...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // ========== PROCESSAR TODOS OS DADOS ==========
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 mx-auto text-warning" />
+          <p className="text-muted-foreground">{error || "Login necessário"}</p>
+          <button
+            onClick={() => window.location.href = "/auth/login"}
+            className="px-6 py-3 bg-primary text-background rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          >
+            Fazer Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ========== RESTANTE CÓDIGO DO DASHBOARD (manter igual) ==========
   const weekActivities = data.activities?.filter((a: Activity) => {
     const daysAgo = (Date.now() - new Date(a.date).getTime()) / (1000 * 60 * 60 * 24);
     return daysAgo <= 7;
@@ -56,10 +104,8 @@ export default function DashboardPage() {
   const totalTime = weekActivities.reduce((sum: number, a: Activity) => sum + a.duration, 0);
   const totalElevation = weekActivities.reduce((sum: number, a: Activity) => sum + (a.elevation || 0), 0);
 
-  // Health metrics - SEM FILTRO de dias para incluir ACWR/CTL/ATL
   const allHealth = data.health || [];
 
-  // Extrair TODAS as métricas disponíveis
   const getLatest = (metricName: string) => {
     const metrics = allHealth.filter(m => m.metric.includes(metricName) && m.value > 0);
     return metrics.length > 0 ? metrics[metrics.length - 1].value : null;
@@ -75,7 +121,6 @@ export default function DashboardPage() {
     return metrics.reduce((sum, m) => sum + m.value, 0) / metrics.length;
   };
 
-  // Métricas específicas
   const restingHR = getLatest('minHeartRate');
   const avgHR = getAverage('averageHeartRate');
   const maxHR = getLatest('maxHeartRate');
@@ -89,14 +134,13 @@ export default function DashboardPage() {
   const steps = getLatest('steps');
   const activeCalories = getLatest('activeKilocalories');
 
-  // VO2 Max estimado
   let estimatedVO2Max = null;
   const runningActivities = weekActivities.filter((a: Activity) => 
     a.type === 'RUNNING' && a.distance >= 1000 && a.duration > 0
   );
   
   if (runningActivities.length > 0) {
-    const bestActivity = runningActivities.reduce((best, current) => {
+    const bestActivity = runningActivities.reduce((best: Activity, current: Activity) => {
       const paceBest = best.duration / best.distance;
       const paceCurrent = current.duration / current.distance;
       return paceCurrent < paceBest ? current : best;
@@ -114,7 +158,6 @@ export default function DashboardPage() {
     }
   }
 
-  // Dados para gráfico de FC
   const hrChartData = Array.from(new Set(allHealth.map(m => m.date))).sort().slice(-7).map(date => ({
     date: new Date(date).toLocaleDateString("pt-PT", { day: '2-digit', month: '2-digit' }),
     resting: allHealth.find(m => m.date === date && m.metric.includes('minHeartRate'))?.value || null,
@@ -122,7 +165,6 @@ export default function DashboardPage() {
     max: allHealth.find(m => m.date === date && m.metric.includes('maxHeartRate'))?.value || null,
   })).filter(d => d.avg !== null);
 
-  // Dados para gráfico de atividades
   const dailyData = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((day, index) => {
     const dayActs = weekActivities.filter((a: Activity) => {
       const actDay = new Date(a.date).getDay();
@@ -141,7 +183,6 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      {/* KPIs PRINCIPAIS */}
       <section>
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Métricas Principais</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -152,12 +193,9 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* IN FOCUS */}
       <section>
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">In Focus</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* Card 1: FC */}
           <Card className="card-neon">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -203,7 +241,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 2: Training Status */}
           <Card className="card-neon">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -249,7 +286,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 3: Running Weekly */}
           <Card className="card-neon">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -278,7 +314,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 4: Resumo */}
           <Card className="card-neon">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -297,7 +332,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ATIVIDADES RECENTES */}
       <section>
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Atividades Recentes</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
